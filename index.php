@@ -1,3 +1,31 @@
+<?php
+$requestUri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+
+// Remove trailing slash
+if ($requestUri !== '/' && substr($requestUri, -1) === '/') {
+    $requestUri = rtrim($requestUri, '/');
+}
+
+// Try .html
+$htmlFile = __DIR__ . $requestUri . '.html';
+if (file_exists($htmlFile)) {
+    include $htmlFile;
+    exit;
+}
+
+// Try .php
+$phpFile = __DIR__ . $requestUri . '.php';
+if (file_exists($phpFile)) {
+    include $phpFile;
+    exit;
+}
+
+// Custom 404
+http_response_code(404);
+include __DIR__ . '/404.php';
+exit;
+?>
+
 <!DOCTYPE html>
 <!-- This site was created in Webflow. https://webflow.com -->
 <!-- Last Published: Wed Oct 09 2024 16:05:01 GMT+0000 (Coordinated Universal Time) -->
