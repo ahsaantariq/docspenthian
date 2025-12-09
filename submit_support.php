@@ -1,10 +1,31 @@
 <?php
 // =========================
-// TELEGRAM MESSAGE FUNCTION
+// LOAD .env FILE
 // =========================
-function sendTelegramMessage($messageText) {
-    $token = "8546620743:AAEBMWZZMm2fu11cQWGh4SaW3oU9BwWB02E"; // <- REPLACE WITH NEW TOKEN
-    $chat_id = "7692376148";
+$envFile = __DIR__ . '/.env';
+
+if (file_exists($envFile)) {
+    $lines = file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    foreach ($lines as $line) {
+        if (strpos(trim($line), '#') === 0) continue;
+        list($key, $value) = explode('=', $line, 2);
+        $_ENV[trim($key)] = trim($value);
+    }
+} else {
+    die("Missing .env file.");
+}
+
+// =========================
+// TELEGRAM FUNCTION
+// =========================
+function sendTelegramMessage($messageText)
+{
+    $token = $_ENV['TELEGRAM_BOT_TOKEN'] ?? null;
+    $chat_id = $_ENV['TELEGRAM_CHAT_ID'] ?? null;
+
+    if (!$token || !$chat_id) {
+        return; // fail silently – don't break form
+    }
 
     $url = "https://api.telegram.org/bot$token/sendMessage";
 
@@ -22,15 +43,14 @@ function sendTelegramMessage($messageText) {
         ]
     ];
 
-    $context  = stream_context_create($options);
-    file_get_contents($url, false, $context);
+    $context = stream_context_create($options);
+    @file_get_contents($url, false, $context);
 }
 
 // =========================
 // PROCESS FORM SUBMISSION
 // =========================
 
-// Get form data
 $email = isset($_POST['Email']) ? trim($_POST['Email']) : '';
 $name = isset($_POST['Name']) ? trim($_POST['Name']) : '';
 $category = isset($_POST['Category']) ? trim($_POST['Category']) : '';
@@ -40,7 +60,7 @@ $error = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
-    // Validate fields
+    // VALIDATION
     if (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $error = 'Please provide a valid email address.';
     } elseif (empty($name)) {
@@ -51,8 +71,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = 'Please provide a message.';
     } else {
 
-        // Prepare email
-        $to = 'info@penthian.com';
+        // EMAIL SETTINGS FROM ENV
+        $to = $_ENV['SUPPORT_EMAIL'] ?? 'info@penthian.com';
+        $fromEmail = $_ENV['FROM_EMAIL'] ?? 'no-reply@penthian.com';
+
         $subject = 'Support Form Submission - ' . $category;
 
         $body = "Name: $name\n";
@@ -60,15 +82,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $body .= "Category: $category\n";
         $body .= "Message:\n$message\n";
 
-        $headers = "From: no-reply@penthian.com\r\n";
+        $headers = "From: $fromEmail\r\n";
         $headers .= "Reply-To: $email\r\n";
 
-        // Try sending email
+        // SEND EMAIL
         if (mail($to, $subject, $body, $headers)) {
 
-            // =======================
-            // SEND TELEGRAM MESSAGE
-            // =======================
+            // SEND TELEGRAM UPDATE
             $telegramMessage =
                 "📩 <b>New Support Request</b>\n" .
                 "<b>Name:</b> $name\n" .
@@ -78,7 +98,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             sendTelegramMessage($telegramMessage);
 
-            // Redirect on success
             header('Location: /support.php?success=1');
             exit;
 
@@ -88,10 +107,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// Redirect back with error
+// ERROR REDIRECT
 if ($error) {
     header('Location: /support.php?error=' . urlencode($error));
     exit;
 }
-
 ?>
